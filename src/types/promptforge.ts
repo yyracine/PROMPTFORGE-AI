@@ -290,6 +290,8 @@ export interface DashboardStats {
   sqliteSizeKb: number;
   aiEngineReady: boolean;
   aiEngineModel: string;
+  apiKeyConfigured?: boolean;
+  apiKeyPreview?: string;
   categoryMetrics?: CategoryUsageMetric[];
   tagMetrics?: TagUsageMetric[];
   timeline?: UsageTimelinePoint[];

@@ -54,28 +54,28 @@ cd PROMPTFORGE-AI
 ```
 
 ### Installation sur Windows
-Double-cliquez simplement sur les scripts fournis à la racine du projet :
-1. **`install.bat`** : Installe toutes les dépendances npm et crée automatiquement votre fichier `.env` s'il n'existe pas.
-2. **`start.bat`** : Démarre le serveur Express + Vite sur `http://localhost:3000` et ouvre votre navigateur.
+1. Téléchargez le **Pack Complet (.ZIP)** depuis le bouton **« Installer l'app »** dans l'application, ou clonez le dépôt Git.
+2. Décompressez l'archive ZIP sur votre ordinateur.
+3. Double-cliquez sur **`setup-windows.bat`** :
+   - Le script vérifie la présence de Node.js.
+   - Il vous propose de **coller directement votre clé API Gemini** (ou d'appuyer sur Entrée pour le mode local gratuit).
+   - Il résout automatiquement les dépendances npm avec `--legacy-peer-deps`.
+   - Il compile l'application de production, crée un raccourci Bureau **PromptForge IA** et lance le serveur sur `http://localhost:3000`.
 
 ### Installation sur macOS / Linux
 Depuis votre terminal :
 ```bash
-chmod +x install.sh start.sh
-./install.sh
-./start.sh
+chmod +x setup-unix.sh
+./setup-unix.sh
 ```
+Le script vous demandera également si vous souhaitez coller votre clé API Gemini lors de l'initialisation du fichier `.env`.
 
-Vous pouvez également utiliser les commandes npm classiques :
-```bash
-npm install
-npm run dev
-```
-
-### Configuration des Clés API
-Ouvrez le fichier `.env` à la racine du projet ou passez par l'interface graphique (**Paramètres ⚙️** en bas de la barre latérale gauche) :
-- **Clé API Gemini (`GEMINI_API_KEY`)** : Permet d'utiliser les modèles `gemini-2.5-flash` et `gemini-2.5-pro` pour l'auto-complétion des formulaires, la génération de méga-prompts et l'audit qualité.
-- **Fournisseur IA alternatif** : Vous pouvez configurer un endpoint compatible OpenAI, Anthropic ou un modèle local (Ollama / LM Studio) depuis la modale **Paramètres IA**.
+### Configuration et Copie de la Clé API Gemini
+- **Dans l'application (Barre Supérieure ou Paramètres) :**
+  - Cliquez sur le bouton **« Installer l’app »** : une bannière dédiée vous permet de **copier la clé active** en un clic ou d'accéder directement au portail Google AI Studio.
+  - Dans la vue **Paramètres** (menu latéral), la section **Fournisseurs d’IA** affiche le statut en temps réel et un bouton de copie rapide du modèle `.env`.
+- **Mode Local & Confidentialité :**
+  PromptForge IA fonctionne parfaitement sans clé API (moteur heuristique local actif, bibliothèque SQLite 100% opérationnelle).
 
 ---
 

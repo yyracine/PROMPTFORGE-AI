@@ -655,9 +655,12 @@ async function startServer() {
       totalGenerations: genRow.c,
       avgGenerationDurationMs: Math.round(genRow.avg_ms),
       sqliteFilePath: DB_FILE_PATH,
-      sqliteSizeKb: fileSizeKb,
       aiEngineReady: aiReady,
       aiEngineModel: 'gemini-3.8-flash',
+      apiKeyConfigured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'),
+      apiKeyPreview: process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY'
+        ? `${process.env.GEMINI_API_KEY.slice(0, 7)}...${process.env.GEMINI_API_KEY.slice(-4)}`
+        : '',
       categoryMetrics,
       tagMetrics,
       timeline: Array.from(timelineMap.values()),
@@ -1479,10 +1482,16 @@ Format attendu : ${outputFormat || 'Non précisé'}
 
     const landingPageDirectiveBlock = landingDetected
       ? `
-CHARTE D'INGÉNIERIE SPÉCIFIQUE AUX LANDING PAGES & CRO (OBLIGATOIRE CAR LE BESOIN CONCERNE UNE LANDING PAGE) :
-Le prompt que tu génères DOIT impérativement commander au modèle cible de respecter les 10 règles d'amélioration suivantes :
+CHARTE D'INGÉNIERIE SPÉCIFIQUE AUX LANDING PAGES, CONVERSION (CRO) & FIABILITÉ TECHNIQUE :
+Le prompt que tu génères DOIT impérativement commander au modèle cible de respecter les règles suivantes issues du retour d'expérience CRO & Ingénierie :
 ${LANDING_PAGE_PROMPT_RULES.map((r) => `- ${r}`).join('\n')}
-Assure-toi que le prompt généré détaille explicitement chaque section de la Landing Page (Top Bar 3 zones, Hero Above-the-Fold, Diagnostic Avant/Après, Grille Bento Mécanisme -> Résultat, Preuves chiffrées en tabular-nums, Grille Tarifaire/Offre, FAQ traitant 5-6 vraies objections, Capture validée & SEO) ainsi que les garde-fous Anti-Slop.`
+
+EXIGENCES CAPITALES SUR LE PROMPT GÉNÉRÉ :
+1. INTÉGRITÉ COMMERCIALE ABSOLUE (Anti-Hallucination) : Le prompt généré doit explicitement interdire à l'IA d'inventer des métriques ou des témoignages factices ("99.4% de conformité JSON", "-68% de tokens", "réduction de 42%"). Si les données mesurées ne sont pas documentées, l'IA doit présenter ces exemples comme illustratifs ou remplacer la preuve sociale par une démonstration concrète du produit (Brief initial -> Prompt obtenu -> Résultat final).
+2. PORTÉE DU PRODUIT : Distinguer clairement le fonctionnement frontend local des véritables opérations nécessitant un backend. Ne jamais simuler une capture de prospects réussie par un simple état React sans endpoint documenté.
+3. SÉCURITÉ RÉALISTE : Parler de réduction des risques, de validation stricte et de séparation des contextes plutôt que d'allégations absolues ("zéro injection").
+4. ACCESSIBILITÉ ET TESTS MESURABLES : WCAG AA (>= 4.5:1 pour le texte courant, >= 3:1 pour les grands titres), navigation clavier et smoke test après compilation npm run build.
+5. CODE COMPLET SOUS WINDOWS : Stack compatible Windows native (PowerShell/CMD sans Docker). Aucun TODO, composant tronqué ou placeholder.`
       : '';
 
     const systemInstruction = `Tu es le moteur central de Prompt Engineering de PromptForge AI.
@@ -1608,9 +1617,12 @@ ${clarificationsText ? `Réponses aux questions de clarification :\n${clarificat
 
     const landingOptimizerBlock = landingDetected
       ? `
-RÈGLES D'AMÉLIORATION OBLIGATOIRES POUR LES PROMPTS DE LANDING PAGE :
-Ce prompt concerne une Landing Page. Lors de son optimisation, tu DOIS systématiquement corriger ses angles morts et intégrer les exigences suivantes :
-${LANDING_PAGE_PROMPT_RULES.map((r) => `- ${r}`).join('\n')}`
+CHARTE DE FIABILITÉ ET D'AMÉLIORATION OBLIGATOIRE POUR LES PROMPTS DE LANDING PAGE :
+Ce prompt concerne une Landing Page. Lors de son optimisation, tu DOIS systématiquement intégrer les règles d'or suivantes :
+${LANDING_PAGE_PROMPT_RULES.map((r) => `- ${r}`).join('\n')}
+- Interdire toute invention de statistiques commerciales invérifiées ; remplacer les fausses preuves par une démonstration concrète du produit.
+- Distinguer les interactions locales du navigateur des intégrations backend réelles.
+- Exiger le protocole de vérification Windows natif (audit de l'existant, package.json, TypeScript sans erreurs, build de production).`
       : '';
 
     const systemInstruction = `Tu es le Module d'Optimisation Chirurgicale de PromptForge AI.

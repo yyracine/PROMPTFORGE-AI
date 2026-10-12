@@ -11,6 +11,8 @@ import {
   Terminal,
   Copy,
   RefreshCw,
+  Key,
+  ExternalLink,
 } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { TARGET_PROFILES } from '../../lib/constants';
@@ -322,6 +324,70 @@ export const SettingsView: React.FC = () => {
             )}
             <span>Tester la connexion au fournisseur</span>
           </button>
+        </div>
+
+        {/* Panneau de configuration et copie de la clé API */}
+        <div className="p-3.5 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Key className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-2">
+                <span>Clé API Google Gemini :</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                  stats?.apiKeyConfigured
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                }`}>
+                  {stats?.apiKeyConfigured ? 'Active côté serveur (.env)' : 'Non configurée (Mode local / heuristique actif)'}
+                </span>
+              </div>
+              <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                {stats?.apiKeyConfigured
+                  ? `Clé masquée active : ${stats.apiKeyPreview}`
+                  : 'Obtenez une clé gratuite sans carte bancaire sur Google AI Studio.'}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)] flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3 text-indigo-400" />
+              <span>Obtenir une clé</span>
+            </a>
+
+            {stats?.apiKeyPreview ? (
+              <button
+                onClick={() => {
+                  if (stats?.apiKeyPreview) {
+                    navigator.clipboard.writeText(stats.apiKeyPreview);
+                    addToast('success', 'Aperçu de la clé copié dans le presse-papiers.');
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <Copy className="w-3 h-3" />
+                <span>Copier aperçu ({stats.apiKeyPreview})</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText('GEMINI_API_KEY=');
+                  addToast('success', 'Modèle GEMINI_API_KEY= copié dans le presse-papiers.');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <Copy className="w-3 h-3" />
+                <span>Copier modèle .env</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {connectionResult && (

@@ -13,6 +13,7 @@ import {
   Sparkles,
   FolderArchive,
   AlertTriangle,
+  Key,
 } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { AppLogo } from './AppLogo';
@@ -36,12 +37,13 @@ export function triggerInstallModal() {
 }
 
 export const InstallPwaManager: React.FC = () => {
-  const { addToast, setActiveView } = useWorkspace();
+  const { addToast, setActiveView, stats } = useWorkspace();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(globalDeferredPrompt);
   const [isInstalled, setIsInstalled] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [downloadingScript, setDownloadingScript] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
 
   const {
     offlineReady: [offlineReady, setOfflineReady],
@@ -236,6 +238,88 @@ export const InstallPwaManager: React.FC = () => {
 
             {/* Body */}
             <div className="p-6 space-y-5 max-h-[78vh] overflow-y-auto">
+              {/* Bannière Clé API Gemini : Copie rapide pour configuration locale */}
+              <div className="p-4 rounded-xl border border-emerald-500/35 bg-gradient-to-r from-emerald-950/30 via-slate-900/40 to-slate-950/40 space-y-2.5">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                      <Key className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--text-main)] flex items-center gap-2">
+                        <span>Clé API Gemini (Optionnelle pour génération IA)</span>
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {stats?.apiKeyConfigured ? 'Active sur le serveur' : 'Gratuite sur Google AI Studio'}
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        Collez cette clé lors de l’exécution du script <code>setup-windows.bat</code> ou dans votre fichier <code>.env</code> local.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-surface)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] border border-[var(--border-subtle)] flex items-center gap-1.5 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Obtenir ma clé</span>
+                    </a>
+
+                    {stats?.apiKeyPreview ? (
+                      <button
+                        onClick={() => {
+                          if (stats?.apiKeyPreview) {
+                            navigator.clipboard.writeText(stats.apiKeyPreview);
+                            setCopiedKey(true);
+                            addToast('success', 'Aperçu de clé copié dans le presse-papiers.');
+                            setTimeout(() => setCopiedKey(false), 2000);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      >
+                        {copiedKey ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Copiée !</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copier aperçu ({stats.apiKeyPreview})</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText('GEMINI_API_KEY=');
+                          setCopiedKey(true);
+                          addToast('success', 'Modèle de ligne .env copié (GEMINI_API_KEY=).');
+                          setTimeout(() => setCopiedKey(false), 2000);
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      >
+                        {copiedKey ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Copié !</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copier format .env</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Option 1: PWA Native Desktop App */}
               <div className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/5 space-y-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">

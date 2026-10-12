@@ -68,7 +68,20 @@ if (Test-Path -LiteralPath $BackendDir) {
     Write-Host "[OK] Backend Python installé." -ForegroundColor Green
 }
 
-# 5. Installation des dépendances Frontend/Fullstack
+# 5. Configuration de l'environnement .env et de la clé API
+$EnvFile = Join-Path $ProjectRoot ".env"
+$EnvExample = Join-Path $ProjectRoot ".env.example"
+if (-not (Test-Path -LiteralPath $EnvFile)) {
+    if (Test-Path -LiteralPath $EnvExample) {
+        Copy-Item -Path $EnvExample -Destination $EnvFile
+        Write-Host "[OK] Fichier .env initialisé depuis .env.example." -ForegroundColor Green
+    } else {
+        Set-Content -Path $EnvFile -Value "GEMINI_API_KEY=\`r\`nPORT=3000\`r\`n"
+        Write-Host "[OK] Fichier .env créé." -ForegroundColor Green
+    }
+}
+
+# 6. Installation des dépendances Frontend/Fullstack
 Write-Host "Installation des dépendances npm..." -ForegroundColor Yellow
 Push-Location -LiteralPath "$ProjectRoot"
 try {

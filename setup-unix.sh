@@ -25,14 +25,24 @@ fi
 
 echo "[OK] Node.js détecté : $(node -v)"
 
-if [ ! -f ".env" ]; then
-  if [ -f ".env.example" ]; then
-    cp .env.example .env
-    echo "[INFO] Fichier .env créé depuis .env.example."
+if [ ! -f ".env" ] || ! grep -q "^GEMINI_API_KEY=" .env || grep -q "^GEMINI_API_KEY=$" .env; then
+  echo ""
+  echo "============================================================================"
+  echo "  CONFIGURATION DE LA CLÉ API GEMINI (OPTIONNELLE MAIS RECOMMANDÉE)"
+  echo "============================================================================"
+  echo "Pour activer la génération de prompts par IA, entrez votre clé GEMINI_API_KEY."
+  read -r -p ">> Collez votre clé API Gemini (ou appuyez sur Entrée pour passer) : " USER_KEY
+  if [ -n "$USER_KEY" ]; then
+    printf "GEMINI_API_KEY=%s\nPORT=3000\n" "$USER_KEY" > .env
+    echo "[OK] Clé API Gemini configurée dans .env."
   else
-    printf "GEMINI_API_KEY=\nPORT=3000\n" > .env
-    echo "[INFO] Fichier .env initialisé."
+    if [ ! -f ".env" ]; then
+      cp .env.example .env 2>/dev/null || printf "GEMINI_API_KEY=\nPORT=3000\n" > .env
+      echo "[INFO] Fichier .env initialisé sans clé (mode local actif)."
+    fi
   fi
+else
+  echo "[OK] Clé API Gemini déjà configurée dans .env."
 fi
 
 echo "[1/2] Installation des dépendances npm..."

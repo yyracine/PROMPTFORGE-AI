@@ -46,16 +46,41 @@ if %ERRORLEVEL% NEQ 0 (
 for /f "delims=" %%v in ('node -v') do set NODE_VER=%%v
 echo [OK] Node.js detecte : %NODE_VER%
 
-REM 2. Creation du fichier .env s'il n'existe pas
-if not exist ".env" (
-    if exist ".env.example" (
-        copy /Y ".env.example" ".env" >nul
-        echo [INFO] Fichier .env cree a partir de .env.example.
-    ) else (
-        echo GEMINI_API_KEY=votre_cle_api_gemini_ici> .env
-        echo PORT=3000>> .env
-        echo [INFO] Fichier .env initialise. Pensez a renseigner votre cle GEMINI_API_KEY dans .env.
+REM 2. Configuration du fichier .env et de la cle API Gemini
+set "CURRENT_API_KEY="
+if exist ".env" (
+    for /f "tokens=1,* delims==" %%A in (.env) do (
+        if "%%A"=="GEMINI_API_KEY" set "CURRENT_API_KEY=%%B"
     )
+)
+
+if not defined CURRENT_API_KEY (
+    echo.
+    echo ============================================================================
+    echo   CONFIGURATION DE LA CLE API GOOGLE GEMINI (OPTIONNELLE MAIS RECOMMANDEE)
+    echo ============================================================================
+    echo Pour generer des prompts avec l'IA cote serveur, PromptForge IA utilise une cle
+    echo API Google Gemini gratuite. (L'application reste utilisable hors-ligne sans cle).
+    echo.
+    set /p "USER_INPUT_KEY=>> Collez votre cle GEMINI_API_KEY (ou appuyez sur ENTREE pour ignorer) : "
+    if defined USER_INPUT_KEY (
+        echo GEMINI_API_KEY=%USER_INPUT_KEY%> .env
+        echo PORT=3000>> .env
+        echo [OK] Cle API Gemini configuree avec succes dans .env.
+    ) else (
+        if not exist ".env" (
+            if exist ".env.example" (
+                copy /Y ".env.example" ".env" >nul
+                echo [INFO] Fichier .env cree depuis .env.example (mode heuristique par defaut).
+            ) else (
+                echo GEMINI_API_KEY=> .env
+                echo PORT=3000>> .env
+                echo [INFO] Fichier .env cree (sans cle API pour l'instant).
+            )
+        )
+    )
+) else (
+    echo [OK] Cle API Gemini deja presente dans le fichier .env.
 )
 
 REM 3. Installation des dependances npm (verifie node_modules, vite ET react-is)
