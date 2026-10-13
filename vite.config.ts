@@ -68,8 +68,7 @@ export default defineConfig(({mode}) => {
           navigateFallbackDenylist: [/^\/api\//],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],
