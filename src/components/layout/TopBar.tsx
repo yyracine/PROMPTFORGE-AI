@@ -13,48 +13,51 @@ import { triggerInstallModal } from '../common/InstallPwaManager';
 
 export const TopBar: React.FC = () => {
   const {
-    activeView,
     setActiveView,
-    searchQuery,
-    setSearchQuery,
-    status,
-    setGeneratorDraft,
+    stats,
+    startNewPromptDraft,
   } = useWorkspace();
+
+  const [localSearch, setLocalSearch] = React.useState('');
 
   const handleGlobalSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setSearchQuery(val);
-    if (val.trim() && activeView !== 'library') {
+    setLocalSearch(val);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (localSearch.trim()) {
       setActiveView('library');
     }
   };
 
   const handleQuickNewPrompt = () => {
-    setGeneratorDraft(null);
-    setActiveView('generator');
+    startNewPromptDraft();
   };
 
   return (
     <header className="h-14 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 flex items-center justify-between gap-4 shrink-0">
       {/* Global Search Bar */}
-      <div className="relative flex-1 max-w-md">
-        <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+        <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
-          value={searchQuery}
+          value={localSearch}
           onChange={handleGlobalSearchChange}
-          placeholder="Rechercher dans vos prompts (titre, tag, modèle, contenu)..."
-          className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-[var(--bg-main)] border border-[var(--border-subtle)] text-[var(--text-main)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-indigo-500 transition-colors"
+          placeholder="Rechercher dans vos prompts (titre, tag, modèle)..."
+          className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-[var(--bg-main)] border border-[var(--border-subtle)] text-[var(--text-main)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-indigo-500 transition-colors"
         />
-        {searchQuery && (
+        {localSearch && (
           <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+            type="button"
+            onClick={() => setLocalSearch('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-main)]"
           >
             Effacer
           </button>
         )}
-      </div>
+      </form>
 
       {/* Status Badges & Quick Actions */}
       <div className="flex items-center gap-2.5 flex-wrap">
@@ -65,7 +68,7 @@ export const TopBar: React.FC = () => {
           className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-pointer hover:bg-emerald-500/15 transition-colors"
         >
           <Database className="w-3 h-3" />
-          <span>SQLite Local ({status?.stats.totalPrompts ?? 0} prompts)</span>
+          <span>SQLite Local ({stats?.totalPrompts ?? 0} prompts)</span>
         </div>
 
         {/* AI Engine Status */}
@@ -73,13 +76,13 @@ export const TopBar: React.FC = () => {
           onClick={() => setActiveView('settings')}
           title="Statut du moteur IA Gemini côté serveur"
           className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer transition-colors ${
-            status?.aiConfigured
+            stats?.aiEngineReady
               ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/15'
               : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/15'
           }`}
         >
           <Sparkles className="w-3 h-3" />
-          <span>{status?.aiConfigured ? 'Moteur IA Prêt' : 'Mode Heuristique'}</span>
+          <span>{stats?.aiEngineReady ? 'Moteur IA Prêt' : 'Mode Heuristique'}</span>
         </div>
 
         {/* Quick Action: Install App (PWA / Desktop) */}

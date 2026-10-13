@@ -45,10 +45,65 @@ const WorkspaceShell: React.FC = () => {
   );
 };
 
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('PromptForge IA Caught UI Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-[#101116] text-[#F3F4F8] p-8 text-center">
+          <div className="max-w-md p-6 rounded-2xl bg-[#1B1D26] border border-amber-500/30 space-y-4 shadow-2xl">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400 font-bold text-xl">
+              !
+            </div>
+            <h2 className="text-lg font-bold">Un problème d'affichage est survenu</h2>
+            <p className="text-xs text-[#A1A6B5] leading-relaxed">
+              Une exception a été interceptée par le bouclier d'erreur :
+            </p>
+            <pre className="p-3 rounded-lg bg-black/50 text-red-400 text-xs font-mono text-left overflow-x-auto border border-red-500/20 max-h-36">
+              {this.state.error?.message || 'Erreur inconnue'}
+            </pre>
+            <div className="flex gap-2 justify-center pt-2">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
+              >
+                Recharger l'application
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <WorkspaceProvider>
-      <WorkspaceShell />
-    </WorkspaceProvider>
+    <AppErrorBoundary>
+      <WorkspaceProvider>
+        <WorkspaceShell />
+      </WorkspaceProvider>
+    </AppErrorBoundary>
   );
 }

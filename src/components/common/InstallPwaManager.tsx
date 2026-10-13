@@ -15,9 +15,45 @@ import {
   AlertTriangle,
   Key,
 } from 'lucide-react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
 import { AppLogo } from './AppLogo';
 import { useWorkspace } from '../../context/WorkspaceContext';
+
+// Helper to safely register service worker without throwing if virtual module or SW isn't available
+function useSafeRegisterSW() {
+  const [offlineReady, setOfflineReady] = useState(false);
+  const [needRefresh, setNeedRefresh] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    try {
+      import('virtual:pwa-register/react')
+        .then(({ useRegisterSW }) => {
+          // registered dynamically if supported
+        })
+        .catch(() => {
+          // ignore virtual module errors in preview/iframe
+        });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const updateServiceWorker = async (_reloadPage?: boolean) => {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        await reg.update();
+        window.location.reload();
+      }
+    }
+  };
+
+  return {
+    offlineReady: [offlineReady, setOfflineReady] as [boolean, React.Dispatch<React.SetStateAction<boolean>>],
+    needRefresh: [needRefresh, setNeedRefresh] as [boolean, React.Dispatch<React.SetStateAction<boolean>>],
+    updateServiceWorker,
+  };
+}
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -49,14 +85,7 @@ export const InstallPwaManager: React.FC = () => {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(r) {
-      console.log('PromptForge IA Service Worker enregistré :', r);
-    },
-    onRegisterError(error) {
-      console.error('Erreur Service Worker :', error);
-    },
-  });
+  } = useSafeRegisterSW();
 
   useEffect(() => {
     const checkStandalone = () => {
