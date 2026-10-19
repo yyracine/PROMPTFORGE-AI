@@ -1388,32 +1388,37 @@ export const LibraryView: React.FC = () => {
       {/* PANNEAU DE RECHERCHE MULTICRITÈRE ET DE FILTRAGE PAR DOSSIER MÉTIER / MODÈLE / TAG */}
       <div className="bg-[var(--bg-surface)] p-5 rounded-xl border border-[var(--border-subtle)] space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-          {/* Barre de recherche par Titre ou Contenu */}
-          <div className="md:col-span-4 relative flex items-center">
-            <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3.5 pointer-events-none transition-colors" />
+          {/* Barre de recherche textuelle dynamique (Tags, Contenu, Titre) */}
+          <div className="md:col-span-5 relative flex items-center">
+            <Search className="w-4 h-4 text-[var(--accent-primary)] absolute left-3.5 pointer-events-none transition-colors" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher par titre ou contenu..."
-              aria-label="Rechercher un prompt par titre ou contenu"
-              className="w-full pl-10 pr-9 py-2.5 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all shadow-2xs"
+              placeholder="Recherche textuelle (tags, contenu du prompt, titre, #django)..."
+              aria-label="Rechercher dynamiquement par tags et contenu"
+              className="w-full pl-10 pr-20 py-2.5 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all shadow-2xs"
             />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  searchInputRef.current?.focus();
-                }}
-                title="Effacer la recherche"
-                aria-label="Effacer la recherche"
-                className="absolute right-3 p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface)] transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <div className="absolute right-2 flex items-center gap-1">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  title="Effacer la recherche textuelle"
+                  aria-label="Effacer la recherche textuelle"
+                  className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface)] transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hidden sm:inline">
+                {filteredPrompts.length}
+              </span>
+            </div>
           </div>
 
           <div className="md:col-span-2">
