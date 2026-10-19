@@ -13,6 +13,10 @@ import {
   TrendingUp,
   Folder,
   Tag as TagIcon,
+  Zap,
+  Layers,
+  Calendar,
+  CheckCircle,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -184,6 +188,58 @@ export const DashboardView: React.FC = () => {
   const topCategoryName = categoryChartData[0]?.fullName || 'Développement logiciel';
   const topTagName = tagChartData[0]?.fullName || '#Django';
 
+  // Widget de statistiques rapides : Nombre de prompts créés, catégories les plus utilisées et dernier prompt optimisé
+  const quickStatsWidget = useMemo(() => {
+    const totalCreated = prompts.length;
+
+    // Catégories les plus utilisées triées par nombre de prompts et activité
+    const topCategories = categoryChartData.slice(0, 4);
+
+    // Détection du dernier prompt optimisé (task_type === 'optimization' ou version v2+ ou updated_at > created_at)
+    const optimizedPrompts = prompts
+      .filter(
+        (p) =>
+          p.task_type === 'optimization' ||
+          (p.tags || []).includes('optimise') ||
+          (p.version && p.version > 1) ||
+          p.updated_at !== p.created_at
+      )
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+    const lastOptimized = optimizedPrompts[0] || null;
+
+    let lastOptimizedFormattedDate = 'Aucune optimisation récente';
+    let lastOptimizedRelative = '';
+    if (lastOptimized) {
+      const d = new Date(lastOptimized.updated_at);
+      lastOptimizedFormattedDate = d.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const diffHours = Math.round((Date.now() - d.getTime()) / (1000 * 60 * 60));
+      if (diffHours < 1) {
+        lastOptimizedRelative = 'Il y a moins d’une heure';
+      } else if (diffHours < 24) {
+        lastOptimizedRelative = `Il y a ${diffHours}h`;
+      } else {
+        const diffDays = Math.floor(diffHours / 24);
+        lastOptimizedRelative = `Il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
+      }
+    }
+
+    return {
+      totalCreated,
+      topCategories,
+      lastOptimized,
+      lastOptimizedFormattedDate,
+      lastOptimizedRelative,
+    };
+  }, [prompts, categoryChartData]);
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-10">
       {/* En-tête de la page avec le logo de l'application */}
@@ -226,6 +282,162 @@ export const DashboardView: React.FC = () => {
             <Sparkles className="w-4 h-4" />
             <span>Créer un prompt</span>
           </button>
+        </div>
+      </div>
+
+      {/* WIDGET DE STATISTIQUES RAPIDES (Prompts créés, Catégories principales, Dernier prompt optimisé) */}
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-[var(--bg-surface)] border border-indigo-500/25 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/35 flex items-center justify-center text-indigo-400 shrink-0">
+              <Zap className="w-4 h-4 text-amber-300" />
+            </div>
+            <div>
+              <h2 className="text-sm font-display font-bold text-[var(--text-main)] flex items-center gap-2">
+                <span>Statistiques Rapides du Workspace</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                  Temps Réel SQLite
+                </span>
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Aperçu instantané de l'activité de création, des dossiers favoris et de la dernière optimisation.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveView('library')}
+              className="text-xs font-semibold text-[var(--accent-primary)] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <span>Voir toute la bibliothèque</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Blocs Principaux du Widget */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+          {/* Bloc 1 : Nombre de prompts créés */}
+          <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Prompts créés</span>
+              </span>
+              <span className="text-[10px] font-mono text-[var(--text-secondary)] bg-[var(--bg-surface-secondary)] px-2 py-0.5 rounded">
+                Base Locale
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-3xl font-display font-extrabold text-[var(--text-main)] font-mono tabular-nums">
+                {quickStatsWidget.totalCreated}
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                {stats?.totalVersions ?? quickStatsWidget.totalCreated} version(s) et itération(s) au total
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px]">
+              <span className="text-[var(--text-secondary)]">Favoris :</span>
+              <span className="font-bold text-[var(--text-main)] font-mono">
+                {stats?.favoritePrompts ?? favoritePrompts.length} prompt(s)
+              </span>
+            </div>
+          </div>
+
+          {/* Bloc 2 : Catégories les plus utilisées */}
+          <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Catégories les plus utilisées</span>
+              </span>
+              <span className="text-[10px] font-mono text-[var(--text-secondary)] bg-[var(--bg-surface-secondary)] px-2 py-0.5 rounded">
+                Top {quickStatsWidget.topCategories.length}
+              </span>
+            </div>
+
+            <div className="space-y-1.5 py-1">
+              {quickStatsWidget.topCategories.length > 0 ? (
+                quickStatsWidget.topCategories.map((cat, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-[var(--text-main)] truncate max-w-[170px]" title={cat.fullName}>
+                      {idx + 1}. {cat.fullName}
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                      {cat.total} act.
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-[var(--text-secondary)] italic py-2">
+                  Aucune activité de catégorie enregistrée.
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+              <span>Dossiers actifs :</span>
+              <span className="font-bold text-[var(--text-main)] font-mono">{categories.length}</span>
+            </div>
+          </div>
+
+          {/* Bloc 3 : Date du dernier prompt optimisé */}
+          <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
+                <span>Dernier prompt optimisé</span>
+              </span>
+              {quickStatsWidget.lastOptimizedRelative && (
+                <span className="text-[10px] font-mono text-purple-300 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded">
+                  {quickStatsWidget.lastOptimizedRelative}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              {quickStatsWidget.lastOptimized ? (
+                <>
+                  <div className="text-sm font-bold text-[var(--text-main)] truncate" title={quickStatsWidget.lastOptimized.title}>
+                    {quickStatsWidget.lastOptimized.title}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                    <Calendar className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span className="font-mono text-[11px] font-semibold text-[var(--text-main)]">
+                      {quickStatsWidget.lastOptimizedFormattedDate}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-[var(--text-secondary)] italic py-2">
+                  Aucun prompt optimisé récemment.
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px]">
+              {quickStatsWidget.lastOptimized ? (
+                <button
+                  type="button"
+                  onClick={() => openPromptInOptimizer(quickStatsWidget.lastOptimized!.generated_content, quickStatsWidget.lastOptimized!.title)}
+                  className="w-full text-center py-1 rounded bg-[var(--bg-surface-secondary)] hover:bg-[var(--accent-primary)] hover:text-white text-[var(--text-main)] font-semibold transition-colors cursor-pointer text-[11px]"
+                >
+                  Ouvrir dans l’Optimiseur
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setActiveView('optimizer')}
+                  className="w-full text-center py-1 rounded bg-[var(--bg-surface-secondary)] hover:bg-[var(--accent-primary)] hover:text-white text-[var(--text-main)] font-semibold transition-colors cursor-pointer text-[11px]"
+                >
+                  Accéder à l’Optimiseur
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
