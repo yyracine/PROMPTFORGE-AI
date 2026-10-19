@@ -11,6 +11,7 @@ import { ToastContainer } from './components/common/ToastContainer';
 import { DashboardView } from './components/views/DashboardView';
 import { GeneratorView } from './components/views/GeneratorView';
 import { OptimizerView } from './components/views/OptimizerView';
+import { PlaygroundView } from './components/views/PlaygroundView';
 import { SoftwareDevView } from './components/views/SoftwareDevView';
 import { LibraryView } from './components/views/LibraryView';
 import { TemplatesView } from './components/views/TemplatesView';
@@ -31,6 +32,7 @@ const WorkspaceShell: React.FC = () => {
           {activeView === 'dashboard' && <DashboardView />}
           {activeView === 'generator' && <GeneratorView />}
           {activeView === 'optimizer' && <OptimizerView />}
+          {activeView === 'playground' && <PlaygroundView />}
           {activeView === 'software-dev' && <SoftwareDevView />}
           {activeView === 'library' && <LibraryView />}
           {activeView === 'templates' && <TemplatesView />}

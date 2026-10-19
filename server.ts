@@ -2421,6 +2421,118 @@ ${finalResponseB}
     }
   });
 
+  // 5.7 Multi-Variant Prompt Playground (Simultaneous parallel execution of prompt variants with identical parameters)
+  app.post('/api/ai/playground-run', async (req, res) => {
+    const startTime = Date.now();
+    const {
+      variants, // Array<{ id: string; name: string; promptText: string; systemInstruction?: string }>
+      targetModel = 'claude-3-7-sonnet',
+      temperature = 0.7,
+      maxOutputTokens = 1200,
+      commonContext = '',
+    } = req.body || {};
+
+    if (!Array.isArray(variants) || variants.length === 0) {
+      res.status(400).json({ error: 'Veuillez fournir au moins une variante de prompt à exécuter.' });
+      return;
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      res.status(503).json({
+        error: "Le fournisseur d'IA n'est pas configuré côté serveur (GEMINI_API_KEY manquante).",
+      });
+      return;
+    }
+
+    const profileObj = TARGET_PROFILES.find((p) => p.id === targetModel) || TARGET_PROFILES[3];
+
+    try {
+      // Execute all variants simultaneously in parallel
+      const executionPromises = variants.map(async (v) => {
+        const vStart = Date.now();
+        const baseSystem = v.systemInstruction?.trim()
+          ? v.systemInstruction.trim()
+          : `Tu es un modèle d'IA de référence exécuté dans le profil ${profileObj.name}. Réponds directement avec rigueur, exhaustivité et pertinence à la requête de l'utilisateur.`;
+
+        const fullPrompt = commonContext.trim()
+          ? `<common_parameters_and_data>\n${commonContext.trim()}\n</common_parameters_and_data>\n\n${v.promptText}`
+          : v.promptText;
+
+        try {
+          const resp = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: fullPrompt,
+            config: {
+              systemInstruction: baseSystem,
+              temperature: Number(temperature) || 0.7,
+              maxOutputTokens: Number(maxOutputTokens) || 1200,
+            },
+          });
+
+          const vDurationMs = Date.now() - vStart;
+          const outputText = resp.text || '';
+          const words = outputText.trim() ? outputText.trim().split(/\s+/).length : 0;
+          const chars = outputText.length;
+
+          return {
+            id: v.id,
+            name: v.name || 'Variante',
+            promptText: v.promptText,
+            systemInstruction: v.systemInstruction || '',
+            output: outputText,
+            status: 'success' as const,
+            durationMs: vDurationMs,
+            wordCount: words,
+            characterCount: chars,
+          };
+        } catch (err: any) {
+          const vDurationMs = Date.now() - vStart;
+          return {
+            id: v.id,
+            name: v.name || 'Variante',
+            promptText: v.promptText,
+            systemInstruction: v.systemInstruction || '',
+            output: `Erreur d’exécution : ${err?.message || 'Erreur inconnue'}`,
+            status: 'error' as const,
+            durationMs: vDurationMs,
+            wordCount: 0,
+            characterCount: 0,
+          };
+        }
+      });
+
+      const results = await Promise.all(executionPromises);
+      const totalDurationMs = Date.now() - startTime;
+
+      logGeneration(
+        null,
+        'generation',
+        'gemini-3.8-flash',
+        variants.reduce((acc, v) => acc + (v.promptText || '').length, 0),
+        results.reduce((acc, r) => acc + r.characterCount, 0),
+        'success',
+        totalDurationMs
+      );
+
+      res.json({
+        targetModel: profileObj.name,
+        targetModelId: profileObj.id,
+        parametersApplied: {
+          temperature,
+          maxOutputTokens,
+          commonContextLength: commonContext.length,
+        },
+        totalDurationMs,
+        results,
+      });
+    } catch (globalErr: any) {
+      res.status(502).json({
+        error: `Erreur lors de l’exécution simultanée des variantes : ${globalErr?.message || 'Erreur'}`,
+      });
+    }
+  });
+
   // ============================================================================
   // 6. BACKUP, RESTORE, IMPORT & WINDOWS PACK EXPORT
   // ============================================================================

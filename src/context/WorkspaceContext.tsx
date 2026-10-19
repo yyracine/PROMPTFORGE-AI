@@ -19,6 +19,7 @@ export type ActiveView =
   | 'dashboard'
   | 'generator'
   | 'optimizer'
+  | 'playground'
   | 'software-dev'
   | 'library'
   | 'templates'

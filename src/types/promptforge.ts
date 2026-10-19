@@ -218,6 +218,38 @@ export interface RewriteAnalysisResult {
   durationMs?: number;
 }
 
+export interface PlaygroundVariant {
+  id: string;
+  name: string;
+  promptText: string;
+  systemInstruction?: string;
+  color?: string;
+}
+
+export interface PlaygroundVariantResult {
+  id: string;
+  name: string;
+  promptText: string;
+  systemInstruction: string;
+  output: string;
+  status: 'success' | 'error';
+  durationMs: number;
+  wordCount: number;
+  characterCount: number;
+}
+
+export interface PlaygroundExecutionBatchResult {
+  targetModel: string;
+  targetModelId: TargetProfileId;
+  parametersApplied: {
+    temperature: number;
+    maxOutputTokens: number;
+    commonContextLength: number;
+  };
+  totalDurationMs: number;
+  results: PlaygroundVariantResult[];
+}
+
 export type SoftwareUseCaseId =
   | 'django_app'
   | 'rest_api'
