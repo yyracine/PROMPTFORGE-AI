@@ -13,10 +13,15 @@ import {
   Gauge,
   FileSpreadsheet,
   FileText,
+  Cpu,
+  Terminal,
+  Layers,
+  BookOpen,
 } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { evaluatePromptHeuristically } from '../../lib/heuristicEvaluator';
 import { computeAutomaticComparisonScoring } from '../../lib/comparisonScorer';
+import { analyzePromptComplexity } from '../../lib/complexityAnalyzer';
 import {
   exportEvaluation8DToCsv,
   exportEvaluation8DToPdf,
@@ -68,6 +73,11 @@ export const EvaluatorView: React.FC = () => {
   const autoScoring = useMemo(() => {
     return computeAutomaticComparisonScoring(evaluatorInput, manualResponseA, manualResponseB);
   }, [evaluatorInput, manualResponseA, manualResponseB]);
+
+  // Real-time Prompt Complexity Analyzer (Tokens, Keyword Density, System Instructions)
+  const complexityAnalysis = useMemo(() => {
+    return analyzePromptComplexity(evaluatorInput);
+  }, [evaluatorInput]);
 
   const handleRunAIAudit = async () => {
     if (!evaluatorInput.trim()) {
@@ -813,6 +823,147 @@ export const EvaluatorView: React.FC = () => {
               placeholder="Collez ou rédigez un prompt ici. L'analyse structurelle locale se calcule instantanément ; cliquez sur « Audit IA 8 dimensions » ou « Comparer 2 modèles »."
               className="w-full p-4 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] font-mono text-xs leading-relaxed text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
             />
+
+            {/* ANALYSEUR DE COMPLEXITÉ DE PROMPT (Tokens, Densité de mots-clés, Instructions Système) */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent border border-indigo-500/20 space-y-3.5">
+              <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                    <Gauge className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-2">
+                      <span>Analyseur de Complexité de Prompt</span>
+                      <span
+                        className={`px-2 py-0.2 rounded text-[10px] font-mono font-bold ${
+                          complexityAnalysis.complexityLevel === 'Ultra-Réglementé'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                            : complexityAnalysis.complexityLevel === 'Complexe'
+                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                            : complexityAnalysis.complexityLevel === 'Modéré'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        }`}
+                      >
+                        {complexityAnalysis.complexityLevel} ({complexityAnalysis.complexityIndex}/100)
+                      </span>
+                    </h3>
+                  </div>
+                </div>
+
+                <span className="text-[11px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 px-2 py-0.5 rounded">
+                  ~{complexityAnalysis.tokens.toLocaleString('fr-FR')} tokens
+                </span>
+              </div>
+
+              {/* Métriques clés en grille 3 colonnes */}
+              <div className="grid grid-cols-3 gap-2 text-center font-mono">
+                <div className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase">Tokens BPE</div>
+                  <div className="text-sm font-bold text-indigo-400">
+                    ~{complexityAnalysis.tokens.toLocaleString('fr-FR')}
+                  </div>
+                  <div className="text-[9px] text-[var(--text-secondary)]">
+                    {complexityAnalysis.words} mots
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase">Mots-clés Clés</div>
+                  <div className="text-sm font-bold text-emerald-400">
+                    {complexityAnalysis.totalKeywordsDetected}
+                  </div>
+                  <div className="text-[9px] text-[var(--text-secondary)]">
+                    {complexityAnalysis.keywordDensity.length} catégories
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase">Niveau Système</div>
+                  <div className="text-sm font-bold text-purple-400">
+                    {complexityAnalysis.systemInstructions.totalScore}/100
+                  </div>
+                  <div className="text-[9px] text-[var(--text-secondary)] truncate">
+                    {complexityAnalysis.systemInstructions.qualificationLevel}
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Détection des Instructions Système */}
+              <div className="space-y-1.5 pt-1 border-t border-[var(--border-subtle)]">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--text-main)]">
+                  <span className="flex items-center gap-1.5">
+                    <Terminal className="w-3 h-3 text-purple-400" />
+                    <span>Instructions Système & Directives Métier</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-[var(--text-secondary)]">
+                    {complexityAnalysis.systemInstructions.detectedSignals.length}/6 critères
+                  </span>
+                </div>
+
+                {complexityAnalysis.systemInstructions.detectedSignals.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {complexityAnalysis.systemInstructions.detectedSignals.map((signal, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/25"
+                      >
+                        <CheckCircle2 className="w-2.5 h-2.5 text-purple-400" />
+                        <span>{signal}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-[var(--text-secondary)] italic">
+                    Aucune instruction système formelle (rôle, XML, contraintes négatives, checklist) détectée.
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Densité de Mots-Clés par Catégorie */}
+              <div className="space-y-1.5 pt-1 border-t border-[var(--border-subtle)]">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--text-main)]">
+                  <span className="flex items-center gap-1.5">
+                    <Layers className="w-3 h-3 text-emerald-400" />
+                    <span>Densité de Mots-Clés Structurants</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-[var(--text-secondary)]">
+                    Richesse : {complexityAnalysis.vocabularyRichnessRatio}%
+                  </span>
+                </div>
+
+                {complexityAnalysis.keywordDensity.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {complexityAnalysis.keywordDensity.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-1.5 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] flex items-center justify-between"
+                      >
+                        <span className="text-[var(--text-main)] font-medium truncate mr-1">
+                          {item.category}
+                        </span>
+                        <span className="font-mono text-[var(--text-secondary)] shrink-0">
+                          {item.count}× ({item.percentage}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-[var(--text-secondary)] italic">
+                    Faible densité de vocabulaire d'ingénierie détectée.
+                  </p>
+                )}
+              </div>
+
+              {/* Recommandation de classe de modèle */}
+              <div className="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-start gap-2 text-[11px] text-[var(--text-secondary)]">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-[var(--text-main)]">Recommandation modèle : </strong>
+                  <span>{complexityAnalysis.recommendedModelClass}</span>
+                </div>
+              </div>
+            </div>
 
             <div className="p-3.5 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] space-y-1.5 text-xs text-[var(--text-secondary)]">
               <div className="font-semibold text-[var(--text-main)] flex items-center gap-1.5">
