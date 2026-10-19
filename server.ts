@@ -926,6 +926,12 @@ async function startServer() {
     if (favorite === 'true') {
       sql += ' AND is_favorite = 1';
     }
+    const { tag } = req.query;
+    if (tag && typeof tag === 'string' && tag.trim() && tag !== 'all') {
+      const cleanTag = tag.trim().replace(/^#+/, '');
+      sql += ' AND id IN (SELECT prompt_id FROM prompt_tags pt INNER JOIN tags t ON t.id = pt.tag_id WHERE t.slug = ? OR LOWER(t.name) = LOWER(?))';
+      params.push(slugify(cleanTag), cleanTag);
+    }
 
     if (sort === 'title') {
       sql += ' ORDER BY title COLLATE NOCASE ASC';
