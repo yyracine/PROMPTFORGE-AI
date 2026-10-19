@@ -1,0 +1,6 @@
+{
+  "name": "PromptForge AI",
+  "description": "Application personnelle professionnelle de génération, d'optimisation, d'évaluation et de gestion de prompts IA avec base de données locale.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

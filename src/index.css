@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+:root {
+  --bg-main: #F7F8FA;
+  --bg-sidebar: #F1F3F7;
+  --bg-surface: #FFFFFF;
+  --bg-surface-secondary: #F4F5F8;
+  --text-main: #171923;
+  --text-secondary: #697386;
+  --accent-primary: #5B5BD6;
+  --accent-secondary: #8176E8;
+  --border-subtle: #E7E9EF;
+  --status-success: #16A34A;
+  --status-warning: #D97706;
+  --status-error: #DC2626;
+}
+
+.dark {
+  --bg-main: #101116;
+  --bg-sidebar: #15161D;
+  --bg-surface: #1B1D26;
+  --bg-surface-secondary: #222530;
+  --text-main: #F3F4F8;
+  --text-secondary: #A1A6B5;
+  --accent-primary: #9290FF;
+  --accent-secondary: #7C7AE6;
+  --border-subtle: #303341;
+  --status-success: #22C55E;
+  --status-warning: #F59E0B;
+  --status-error: #EF4444;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+@layer base {
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .dark body {
+    letter-spacing: 0.008em;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    text-wrap: balance;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbar for sleek Linear/Raycast look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}

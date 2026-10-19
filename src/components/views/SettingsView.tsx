@@ -1,0 +1,962 @@
+import React, { useState } from 'react';
+import {
+  Sun,
+  Moon,
+  Monitor,
+  Database,
+  Download,
+  Upload,
+  CheckCircle2,
+  Loader2,
+  Terminal,
+  Copy,
+  RefreshCw,
+  Key,
+  ExternalLink,
+  HelpCircle,
+  Shield,
+  Check,
+  Eye,
+  EyeOff,
+  Sparkles,
+  X,
+  Info,
+} from 'lucide-react';
+import { useWorkspace } from '../../context/WorkspaceContext';
+import { TARGET_PROFILES } from '../../lib/constants';
+import { WINDOWS_PACK_FILES, WindowsExportFile } from '../../lib/windowsPackContent';
+import {
+  DetailLevel,
+  GenerationMode,
+  OutputFormat,
+  TargetProfileId,
+  ThemeMode,
+} from '../../types/promptforge';
+
+export const SettingsView: React.FC = () => {
+  const {
+    theme,
+    setTheme,
+    stats,
+    settings,
+    refreshAllData,
+    addToast,
+  } = useWorkspace();
+
+  const [defaultMode, setDefaultMode] = useState<GenerationMode>(
+    settings.default_mode || 'professionnel'
+  );
+  const [defaultDetail, setDefaultDetail] = useState<DetailLevel>(
+    settings.default_detail_level || 'standard'
+  );
+  const [preferredTarget, setPreferredTarget] = useState<TargetProfileId>(
+    settings.preferred_target_profile || 'claude-code'
+  );
+  const [preferredFormat, setPreferredFormat] = useState<OutputFormat>(
+    settings.preferred_output_format || 'markdown'
+  );
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{
+    ok: boolean;
+    message: string;
+    latencyMs?: number;
+  } | null>(null);
+
+  // Modal: 'How to configure your API key' & inline safe configuration
+  const [showKeyGuideModal, setShowKeyGuideModal] = useState(false);
+  const [inputApiKey, setInputApiKey] = useState('');
+  const [showApiKeyText, setShowApiKeyText] = useState(false);
+  const [isSavingApiKey, setIsSavingApiKey] = useState(false);
+
+  // Import / Restore state
+  const [importPreview, setImportPreview] = useState<{
+    payload: any;
+    totalIncoming: number;
+    duplicateCount: number;
+    duplicateTitles: string[];
+  } | null>(null);
+  const [duplicateStrategy, setDuplicateStrategy] = useState<'skip' | 'duplicate' | 'overwrite'>(
+    'duplicate'
+  );
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  // Selected Windows script to inspect/download
+  const [selectedWinFile, setSelectedWinFile] = useState<WindowsExportFile>(
+    WINDOWS_PACK_FILES[0]
+  );
+
+  const handleSavePreferences = async () => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          default_mode: defaultMode,
+          default_detail_level: defaultDetail,
+          preferred_target_profile: preferredTarget,
+          preferred_output_format: preferredFormat,
+        }),
+      });
+      if (res.ok) {
+        await refreshAllData();
+        addToast('success', 'Préférences de génération enregistrées dans SQLite.');
+      }
+    } catch (err: any) {
+      addToast('error', `Erreur : ${err.message}`);
+    }
+  };
+
+  const handleTestProvider = async () => {
+    setIsTestingConnection(true);
+    setConnectionResult(null);
+    try {
+      const res = await fetch('/api/provider/test', { method: 'POST' });
+      const data = await res.json();
+      setConnectionResult(data);
+      if (data.ok) {
+        addToast('success', data.message);
+      } else {
+        addToast('warning', data.message);
+      }
+    } catch (err: any) {
+      setConnectionResult({ ok: false, message: `Erreur réseau : ${err.message}` });
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  const handleSaveApiKey = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!inputApiKey.trim()) {
+      addToast('warning', 'Veuillez saisir ou coller votre clé API Gemini.');
+      return;
+    }
+    setIsSavingApiKey(true);
+    try {
+      const res = await fetch('/api/provider/key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: inputApiKey.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addToast('success', data.message || 'Clé API enregistrée et activée avec succès !');
+        setInputApiKey('');
+        await refreshAllData();
+        // Automatically run quick test
+        handleTestProvider();
+      } else {
+        addToast('error', data.error || "Impossible d'enregistrer la clé API.");
+      }
+    } catch (err: any) {
+      addToast('error', `Erreur réseau : ${err.message}`);
+    } finally {
+      setIsSavingApiKey(false);
+    }
+  };
+
+  // Sauvegarde complète JSON (prompts, versions, catégories, tags, modèles, préférences non sensibles)
+  const handleExportFullBackup = async () => {
+    try {
+      const res = await fetch('/api/backup/export');
+      if (!res.ok) {
+        addToast('error', 'Impossible de générer la sauvegarde.');
+        return;
+      }
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json;charset=utf-8',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `promptforge-backup-${dateStr}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addToast(
+        'success',
+        'Sauvegarde complète exportée au format JSON (sans aucune clé API).'
+      );
+    } catch (err: any) {
+      addToast('error', `Erreur : ${err.message}`);
+    }
+  };
+
+  // Lecture et validation d'un fichier JSON ou Markdown avant import/restauration
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      let payload: any;
+
+      if (file.name.endsWith('.md') || file.name.endsWith('.txt')) {
+        // Parse Markdown prompt import
+        const lines = text.split(/\r?\n/);
+        const firstHeading = lines.find((l) => l.startsWith('# '))?.replace(/^#\s+/, '').trim();
+        payload = {
+          title: firstHeading || file.name.replace(/\.(md|txt)$/i, ''),
+          description: 'Importé depuis un fichier Markdown',
+          generated_content: text,
+          domain: 'Développement logiciel',
+          output_format: 'markdown',
+        };
+      } else {
+        payload = JSON.parse(text);
+      }
+
+      const inspectRes = await fetch('/api/backup/inspect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const inspectData = await inspectRes.json();
+      if (!inspectRes.ok || !inspectData.valid) {
+        addToast('error', inspectData.error || 'Fichier non reconnu ou invalide.');
+        return;
+      }
+
+      setImportPreview({
+        payload,
+        totalIncoming: inspectData.totalIncoming,
+        duplicateCount: inspectData.duplicateCount,
+        duplicateTitles: inspectData.duplicateTitles || [],
+      });
+    } catch (err: any) {
+      addToast('error', `Fichier invalide : ${err.message}`);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+    setIsRestoring(true);
+    try {
+      const res = await fetch('/api/backup/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payload: importPreview.payload,
+          strategy: duplicateStrategy,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await refreshAllData();
+        setImportPreview(null);
+        addToast(
+          'success',
+          `Importation terminée : ${data.importedCount} prompt(s) enregistré(s), ${data.skippedCount} ignoré(s).`
+        );
+      } else {
+        addToast('error', data.error || 'Erreur lors de la restauration.');
+      }
+    } catch (err: any) {
+      addToast('error', `Erreur : ${err.message}`);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  const handleDownloadWindowsFile = (file: WindowsExportFile) => {
+    const filename = file.path.split('/').pop() || 'script.ps1';
+    const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('success', `Fichier « ${filename} » téléchargé.`);
+  };
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto space-y-8">
+      {/* En-tête */}
+      <div className="border-b border-[var(--border-subtle)] pb-5">
+        <h1 className="text-2xl font-display font-bold text-[var(--text-main)]">
+          Paramètres, Sauvegarde et Pack Windows
+        </h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          Configurez l’apparence, les préférences de génération, les sauvegardes SQLite et les scripts PowerShell pour Windows.
+        </p>
+      </div>
+
+      {/* Section 1 : Apparence (Clair, Sombre, Automatique) */}
+      <section className="p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-4">
+        <div>
+          <h2 className="text-base font-display font-semibold text-[var(--text-main)]">
+            1. Apparence et Thème
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)]">
+            La préférence est enregistrée localement et appliquée immédiatement sans jamais réinitialiser vos brouillons en cours.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {(
+            [
+              {
+                mode: 'light',
+                title: 'Mode Clair',
+                desc: 'Fond #F7F8FA et surfaces #FFFFFF haute lisibilité',
+                icon: Sun,
+              },
+              {
+                mode: 'dark',
+                title: 'Mode Sombre',
+                desc: 'Fond #101116 et surfaces #1B1D26 à contraste calibré',
+                icon: Moon,
+              },
+              {
+                mode: 'system',
+                title: 'Mode Automatique',
+                desc: 'Synchronisé avec les préférences de votre système',
+                icon: Monitor,
+              },
+            ] as { mode: ThemeMode; title: string; desc: string; icon: any }[]
+          ).map((item) => {
+            const Icon = item.icon;
+            const active = theme === item.mode;
+            return (
+              <button
+                key={item.mode}
+                onClick={() => setTheme(item.mode)}
+                className={`p-4 rounded-xl border text-left transition-colors flex items-start gap-3 ${
+                  active
+                    ? 'border-[var(--accent-primary)] bg-[var(--bg-surface-secondary)]'
+                    : 'border-[var(--border-subtle)] hover:bg-[var(--bg-surface-secondary)]/50'
+                }`}
+              >
+                <Icon className="w-5 h-5 text-[var(--accent-primary)] shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-sm font-display font-semibold text-[var(--text-main)]">
+                    {item.title}
+                  </div>
+                  <div className="text-xs text-[var(--text-secondary)] mt-0.5">{item.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Section 2 : Fournisseurs d'IA & Profils de Modèles */}
+      <section className="p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-display font-semibold text-[var(--text-main)]">
+              2. Fournisseurs d’IA et Sécurité des Clés
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Les appels aux modèles sont exécutés exclusivement par le serveur backend. Aucune clé API n’est exposée au frontend.
+            </p>
+          </div>
+
+          <button
+            onClick={handleTestProvider}
+            disabled={isTestingConnection}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-medium disabled:opacity-50 whitespace-nowrap shrink-0"
+          >
+            {isTestingConnection ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" />
+            )}
+            <span>Tester la connexion au fournisseur</span>
+          </button>
+        </div>
+
+        {/* Panneau de configuration et copie de la clé API */}
+        <div className="p-3.5 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Key className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-2">
+                <span>Clé API Google Gemini :</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                  stats?.apiKeyConfigured
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                }`}>
+                  {stats?.apiKeyConfigured ? 'Active côté serveur (.env)' : 'Non configurée (Mode local / heuristique actif)'}
+                </span>
+              </div>
+              <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                {stats?.apiKeyConfigured
+                  ? `Clé masquée active : ${stats.apiKeyPreview}`
+                  : 'Obtenez une clé gratuite sans carte bancaire sur Google AI Studio.'}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setShowKeyGuideModal(true)}
+              className="px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-xs text-indigo-300 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Guide visuel : Comment configurer</span>
+            </button>
+
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)] flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3 text-indigo-400" />
+              <span>Créer sur Google AI Studio</span>
+            </a>
+
+            {stats?.apiKeyPreview ? (
+              <button
+                onClick={() => {
+                  if (stats?.apiKeyPreview) {
+                    navigator.clipboard.writeText(stats.apiKeyPreview);
+                    addToast('success', 'Aperçu de la clé copié dans le presse-papiers.');
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <Copy className="w-3 h-3" />
+                <span>Copier aperçu ({stats.apiKeyPreview})</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText('GEMINI_API_KEY=');
+                  addToast('success', 'Modèle GEMINI_API_KEY= copié dans le presse-papiers.');
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              >
+                <Copy className="w-3 h-3" />
+                <span>Copier modèle .env</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Formulaire de configuration rapide et sécurisée sans éditer de fichier manuellement */}
+        <form onSubmit={handleSaveApiKey} className="p-4 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-[var(--text-main)] flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Enregistrement direct dans le stockage sécurisé (.env local) :</span>
+            </label>
+            <span className="text-[11px] text-[var(--text-secondary)]">
+              Stockée localement · Jamais transmise à des tiers
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Key className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type={showApiKeyText ? 'text' : 'password'}
+                value={inputApiKey}
+                onChange={(e) => setInputApiKey(e.target.value)}
+                placeholder="Collez ici votre clé Google Gemini (ex: AIzaSy...)"
+                className="w-full pl-9 pr-10 py-2 text-xs rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-main)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-indigo-500 font-mono transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKeyText((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-main)] p-1"
+                title={showApiKeyText ? 'Masquer la clé' : 'Afficher la clé en clair'}
+              >
+                {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSavingApiKey || !inputApiKey.trim()}
+              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+            >
+              {isSavingApiKey ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Check className="w-3.5 h-3.5" />
+              )}
+              <span>Enregistrer & Activer</span>
+            </button>
+          </div>
+        </form>
+
+        {connectionResult && (
+          <div
+            className={`p-3.5 rounded-lg border text-xs flex items-center justify-between ${
+              connectionResult.ok
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-[var(--text-main)]'
+                : 'border-amber-500/40 bg-amber-500/10 text-[var(--text-main)]'
+            }`}
+          >
+            <span>{connectionResult.message}</span>
+            {connectionResult.latencyMs !== undefined && (
+              <span className="font-mono tabular-nums font-semibold">
+                {connectionResult.latencyMs} ms
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          {TARGET_PROFILES.map((tp) => (
+            <div
+              key={tp.id}
+              className="p-3.5 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] space-y-1"
+            >
+              <div className="text-xs font-display font-semibold text-[var(--text-main)]">
+                {tp.name}
+              </div>
+              <div className="text-[11px] text-[var(--text-secondary)]">{tp.description}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Section 3 : Préférences de génération par défaut */}
+      <section className="p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-display font-semibold text-[var(--text-main)]">
+              3. Préférences de génération par défaut
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Paramètres pré-sélectionnés lorsque vous cliquez sur « Nouveau prompt ».
+            </p>
+          </div>
+          <button
+            onClick={handleSavePreferences}
+            className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-medium"
+          >
+            Enregistrer les préférences
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+              Mode par défaut
+            </label>
+            <select
+              value={defaultMode}
+              onChange={(e) => setDefaultMode(e.target.value as GenerationMode)}
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)]"
+            >
+              <option value="rapide">Mode Rapide</option>
+              <option value="professionnel">Mode Professionnel</option>
+              <option value="expert">Mode Expert</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+              Niveau de détail
+            </label>
+            <select
+              value={defaultDetail}
+              onChange={(e) => setDefaultDetail(e.target.value as DetailLevel)}
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)]"
+            >
+              <option value="concis">Concis</option>
+              <option value="standard">Standard</option>
+              <option value="exhaustif">Exhaustif</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+              Modèle cible préféré
+            </label>
+            <select
+              value={preferredTarget}
+              onChange={(e) => setPreferredTarget(e.target.value as TargetProfileId)}
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)]"
+            >
+              {TARGET_PROFILES.map((tp) => (
+                <option key={tp.id} value={tp.id}>
+                  {tp.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[var(--text-secondary)]">
+              Format de sortie préféré
+            </label>
+            <select
+              value={preferredFormat}
+              onChange={(e) => setPreferredFormat(e.target.value as OutputFormat)}
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)]"
+            >
+              <option value="markdown">Markdown</option>
+              <option value="xml">Balises XML</option>
+              <option value="json">JSON</option>
+              <option value="texte">Texte brut</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 4 : Données, Sauvegarde et Restauration SQLite */}
+      <section className="p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-display font-semibold text-[var(--text-main)] flex items-center gap-2">
+              <Database className="w-4 h-4 text-[var(--accent-primary)]" />
+              <span>4. Base de données locale SQLite, Sauvegarde et Restauration</span>
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Emplacement actif : <code className="font-mono">{stats?.sqliteFilePath || '.data/promptforge.sqlite'}</code> ({stats?.sqliteSizeKb || 24} Ko)
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={handleExportFullBackup}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-secondary)] hover:bg-[var(--bg-main)] text-xs font-medium text-[var(--text-main)]"
+            >
+              <Download className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+              <span>Exporter une sauvegarde complète (.JSON)</span>
+            </button>
+
+            <label className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-medium cursor-pointer">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Importer / Restaurer (.JSON, .MD)</span>
+              <input
+                type="file"
+                accept=".json,.md,.txt"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Panneau de confirmation et résolution des doublons lors d'un import/restauration */}
+        {importPreview && (
+          <div className="p-5 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--accent-primary)] space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-display font-semibold text-[var(--text-main)]">
+                Validation du fichier importé avant enregistrement
+              </h3>
+              <button
+                onClick={() => setImportPreview(null)}
+                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+              >
+                Annuler
+              </button>
+            </div>
+
+            <div className="text-xs text-[var(--text-secondary)] space-y-1">
+              <p>
+                Prompts valides détectés dans le fichier :{' '}
+                <strong className="text-[var(--text-main)] font-mono">
+                  {importPreview.totalIncoming}
+                </strong>
+              </p>
+              <p>
+                Doublons détectés avec votre bibliothèque existante :{' '}
+                <strong className="text-[var(--text-main)] font-mono">
+                  {importPreview.duplicateCount}
+                </strong>
+                {importPreview.duplicateTitles.length > 0 &&
+                  ` (${importPreview.duplicateTitles.slice(0, 3).join(', ')})`}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[var(--text-main)]">
+                Comportement explicite en cas de doublon :
+              </label>
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="dupStrategy"
+                    checked={duplicateStrategy === 'duplicate'}
+                    onChange={() => setDuplicateStrategy('duplicate')}
+                  />
+                  <span>Conserver les deux (ajouter le suffixe « (Importé) »)</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="dupStrategy"
+                    checked={duplicateStrategy === 'skip'}
+                    onChange={() => setDuplicateStrategy('skip')}
+                  />
+                  <span>Ignorer les doublons</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="dupStrategy"
+                    checked={duplicateStrategy === 'overwrite'}
+                    onChange={() => setDuplicateStrategy('overwrite')}
+                  />
+                  <span>Mettre à jour les prompts existants (crée une nouvelle version)</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setImportPreview(null)}
+                className="px-3.5 py-1.5 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmImport}
+                disabled={isRestoring}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-medium"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{isRestoring ? 'Importation...' : 'Confirmer et importer'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Section 5 : Compatibilité Windows sans Docker (Scripts PowerShell & FastAPI) */}
+      <section className="p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-display font-semibold text-[var(--text-main)] flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[var(--accent-primary)]" />
+              <span>5. Scripts d’installation et de lancement Windows (Sans Docker)</span>
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Scripts PowerShell (.ps1) gérant les chemins avec espaces et code de référence du backend Python/FastAPI.
+            </p>
+          </div>
+
+          <button
+            onClick={() => handleDownloadWindowsFile(selectedWinFile)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-medium whitespace-nowrap shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Télécharger {selectedWinFile.path.split('/').pop()}</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {WINDOWS_PACK_FILES.map((wf) => (
+            <button
+              key={wf.path}
+              onClick={() => setSelectedWinFile(wf)}
+              className={`px-3 py-1.5 rounded-lg font-mono text-xs border transition-colors ${
+                selectedWinFile.path === wf.path
+                  ? 'border-[var(--accent-primary)] bg-[var(--bg-surface-secondary)] text-[var(--text-main)] font-semibold'
+                  : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+              }`}
+            >
+              {wf.path}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+            <span>{selectedWinFile.description}</span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(selectedWinFile.content);
+                addToast('success', `Contenu de ${selectedWinFile.path} copié.`);
+              }}
+              className="flex items-center gap-1 text-[var(--accent-primary)] hover:underline shrink-0"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copier le script</span>
+            </button>
+          </div>
+          <pre className="p-4 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] font-mono text-xs leading-relaxed text-[var(--text-main)] overflow-x-auto max-h-80 overflow-y-auto">
+            {selectedWinFile.content}
+          </pre>
+        </div>
+      </section>
+
+      {/* Modal: How to configure your API key (Guide visuel et stockage sécurisé) */}
+      {showKeyGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div
+            className="w-full max-w-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-api-guide-title"
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between gap-4 bg-[var(--bg-surface-secondary)] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 id="modal-api-guide-title" className="text-base font-display font-bold text-[var(--text-main)]">
+                    Comment configurer votre clé API Google Gemini
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Guide pas à pas en 3 étapes · Gratuit sans carte bancaire · Stockage sécurisé local
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowKeyGuideModal(false)}
+                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface)] transition-colors"
+                aria-label="Fermer la boîte de dialogue"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Visual Steps */}
+            <div className="p-6 overflow-y-auto space-y-6 text-xs text-[var(--text-main)]">
+              {/* Security Banner */}
+              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-3">
+                <Shield className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-semibold text-emerald-300">
+                    Garantie de confidentialité et stockage sécurisé
+                  </div>
+                  <p className="text-[11px] text-emerald-400/90 leading-relaxed">
+                    Votre clé est enregistrée exclusivement dans votre fichier local <code>.env</code> sur votre propre ordinateur. Elle n'est jamais transmise à des tiers, jamais exposée au navigateur (frontend) et sert uniquement à vos requêtes serveur directes avec l'API Google.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 1 */}
+              <div className="flex items-start gap-3.5">
+                <div className="w-7 h-7 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
+                  1
+                </div>
+                <div className="space-y-2 flex-1">
+                  <div className="font-semibold text-sm text-[var(--text-main)]">
+                    Créez votre clé sur Google AI Studio (Gratuit)
+                  </div>
+                  <p className="text-[var(--text-secondary)] leading-relaxed">
+                    Rendez-vous sur la console Google AI Studio. Si vous avez un compte Google personnel, la création d'une clé API est gratuite et immédiate (aucun moyen de paiement requis).
+                  </p>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors"
+                  >
+                    <span>Ouvrir Google AI Studio (Get API Key)</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex items-start gap-3.5">
+                <div className="w-7 h-7 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
+                  2
+                </div>
+                <div className="space-y-2 flex-1">
+                  <div className="font-semibold text-sm text-[var(--text-main)]">
+                    Copiez la chaîne de clé générée
+                  </div>
+                  <p className="text-[var(--text-secondary)] leading-relaxed">
+                    Sur Google AI Studio, cliquez sur le bouton bleu <strong>« Create API key »</strong> puis sur l'icône de copie à droite de la clé. La clé commence généralement par <code className="px-1.5 py-0.5 rounded bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] font-mono">AIzaSy...</code>
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 3: Direct Save in App */}
+              <div className="flex items-start gap-3.5">
+                <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
+                  3
+                </div>
+                <div className="space-y-3 flex-1">
+                  <div className="font-semibold text-sm text-[var(--text-main)]">
+                    Collez et enregistrez votre clé directement ci-dessous
+                  </div>
+                  <p className="text-[var(--text-secondary)] leading-relaxed">
+                    Pas besoin de modifier manuellement de fichier ou d'utiliser le terminal : collez-la ici et cliquez sur « Sauvegarder dans .env ». L'application l'enregistre immédiatement dans le stockage sécurisé.
+                  </p>
+
+                  <div className="p-3.5 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] space-y-2.5">
+                    <div className="relative">
+                      <Key className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type={showApiKeyText ? 'text' : 'password'}
+                        value={inputApiKey}
+                        onChange={(e) => setInputApiKey(e.target.value)}
+                        placeholder="Collez ici votre clé Google Gemini (AIzaSy...)"
+                        className="w-full pl-9 pr-10 py-2 text-xs rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-main)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-indigo-500 font-mono transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKeyText((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-main)] p-1"
+                      >
+                        {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1">
+                        <Info className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Enregistrement automatique dans <code>.env</code></span>
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const currentVal = inputApiKey.trim();
+                          if (!currentVal) {
+                            addToast('warning', 'Veuillez coller votre clé API Gemini.');
+                            return;
+                          }
+                          await handleSaveApiKey();
+                          setShowKeyGuideModal(false);
+                        }}
+                        disabled={isSavingApiKey || !inputApiKey.trim()}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      >
+                        {isSavingApiKey ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        <span>Sauvegarder dans .env</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-secondary)] flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-[var(--text-secondary)]">
+                {stats?.apiKeyConfigured
+                  ? `Clé active configurée : ${stats.apiKeyPreview}`
+                  : 'Mode local / heuristique actif sans clé'}
+              </span>
+
+              <button
+                onClick={() => setShowKeyGuideModal(false)}
+                className="px-4 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-secondary)] text-xs text-[var(--text-main)] transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
