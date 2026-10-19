@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ChevronRight,
   Zap,
+  FileDown,
 } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { OPTIMIZATION_OPERATIONS, TARGET_PROFILES } from '../../lib/constants';
@@ -187,6 +188,100 @@ export const OptimizerView: React.FC = () => {
   };
 
   const displayedOptimized = editableOptimized || optimizerResult?.optimizedPrompt || '';
+
+  // Exportation du prompt optimisé vers .md ou .json pour faciliter la portabilité des données
+  const handleExportOptimized = (format: 'md' | 'json' | 'txt') => {
+    if (!displayedOptimized.trim()) {
+      addToast('warning', 'Aucun prompt optimisé disponible à exporter.');
+      return;
+    }
+
+    const titleSlug = (saveTitle.trim() || 'prompt-optimise')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    const profileObj = TARGET_PROFILES.find((p) => p.id === optimizerTarget) || TARGET_PROFILES[0];
+    let content = displayedOptimized;
+    let mime = 'text/plain;charset=utf-8';
+    let ext = 'txt';
+
+    if (format === 'md') {
+      ext = 'md';
+      mime = 'text/markdown;charset=utf-8';
+      const summaryLines = optimizerResult?.summary
+        ? [
+            '## Résumé des Optimisations Appliquées',
+            '',
+            `### 1. Éléments Clarifiés`,
+            ...(optimizerResult.summary.clarifiedElements || []).map((e) => `- ${e}`),
+            '',
+            `### 2. Informations & Structures Ajoutées`,
+            ...(optimizerResult.summary.addedInformation || []).map((e) => `- ${e}`),
+            '',
+            `### 3. Contraintes & Règles Renforcées`,
+            ...(optimizerResult.summary.improvedConstraints || []).map((e) => `- ${e}`),
+            '',
+            '---',
+            '',
+          ].join('\n')
+        : '';
+
+      content = [
+        `# ${saveTitle.trim() || 'Prompt Optimisé — PromptForge IA'}`,
+        '',
+        `- **Modèle Cible** : ${profileObj.name}`,
+        `- **Opérations Appliquées** : ${optimizerOperations.join(', ') || 'Optimisation standard'}`,
+        `- **Date d'Export** : ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`,
+        '',
+        summaryLines,
+        '## Prompt Optimisé (Prêt à l’Emploi)',
+        '',
+        displayedOptimized,
+        '',
+        '---',
+        '',
+        '## Prompt Original (Source)',
+        '',
+        optimizerInput,
+      ].join('\n');
+    } else if (format === 'json') {
+      ext = 'json';
+      mime = 'application/json;charset=utf-8';
+      content = JSON.stringify(
+        {
+          title: saveTitle.trim() || 'Prompt Optimisé',
+          exported_at: new Date().toISOString(),
+          target_profile: {
+            id: profileObj.id,
+            name: profileObj.name,
+            provider: profileObj.provider,
+            recommended_format: profileObj.recommendedFormat,
+          },
+          applied_operations: optimizerOperations,
+          original_prompt: optimizerInput,
+          optimized_prompt: displayedOptimized,
+          optimization_summary: optimizerResult?.summary || null,
+          metadata: {
+            tool: 'PromptForge IA',
+            version: '1.0.0',
+            source: 'OptimizerView',
+          },
+        },
+        null,
+        2
+      );
+    }
+
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${titleSlug || 'prompt-optimise'}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('success', `Prompt optimisé exporté au format .${ext.toUpperCase()}.`);
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -540,22 +635,56 @@ export const OptimizerView: React.FC = () => {
             comparisonBaseText={optimizerInput}
           />
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1 border-t border-[var(--border-subtle)]">
             <input
               type="text"
               value={saveTitle}
               onChange={(e) => setSaveTitle(e.target.value)}
-              placeholder="Titre pour enregistrer cette version optimisée..."
+              placeholder="Titre pour enregistrer ou exporter cette version..."
               className="flex-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] text-xs text-[var(--text-main)]"
             />
-            <button
-              onClick={handleSaveOptimized}
-              disabled={!displayedOptimized.trim() || isSaving}
-              className="flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-medium disabled:opacity-40 whitespace-nowrap shrink-0"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>{isSaving ? 'Enregistrement...' : 'Enregistrer'}</span>
-            </button>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Boutons d'Exportation Portables (.MD, .JSON, .TXT) */}
+              <div className="flex items-center gap-1 bg-[var(--bg-surface-secondary)] p-0.5 rounded-lg border border-[var(--border-subtle)]">
+                <button
+                  type="button"
+                  onClick={() => handleExportOptimized('md')}
+                  disabled={!displayedOptimized.trim()}
+                  title="Exporter ce prompt optimisé au format Markdown (.md) avec bilan d'optimisation"
+                  className="px-2 py-1 rounded text-xs font-mono font-semibold text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
+                >
+                  .MD
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportOptimized('json')}
+                  disabled={!displayedOptimized.trim()}
+                  title="Exporter ce prompt optimisé au format JSON (.json) avec métadonnées complètes"
+                  className="px-2 py-1 rounded text-xs font-mono font-semibold text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
+                >
+                  .JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportOptimized('txt')}
+                  disabled={!displayedOptimized.trim()}
+                  title="Exporter ce prompt au format texte brut (.txt)"
+                  className="px-2 py-1 rounded text-xs font-mono text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-40"
+                >
+                  .TXT
+                </button>
+              </div>
+
+              <button
+                onClick={handleSaveOptimized}
+                disabled={!displayedOptimized.trim() || isSaving}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[var(--accent-primary)] hover:opacity-95 text-white text-xs font-medium disabled:opacity-40 whitespace-nowrap shrink-0 transition-opacity cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSaving ? 'Enregistrement...' : 'Enregistrer'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
