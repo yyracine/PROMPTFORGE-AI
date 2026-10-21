@@ -2775,6 +2775,7 @@ ${finalResponseB}
           '.npmrc',
           '.gitignore',
           'setup-windows.bat',
+          'lancer-windows.bat',
           'setup-unix.sh',
           'Guide.md',
           'description.md',
@@ -2793,11 +2794,22 @@ ${finalResponseB}
           }
         }
 
+        const prebuiltZip = path.join(process.cwd(), 'public', 'PromptForge-IA-Derniere-Version.zip');
+        if (fs.existsSync(prebuiltZip)) {
+          const fileData = fs.readFileSync(prebuiltZip);
+          res.setHeader('Content-Type', 'application/zip');
+          res.setHeader('Content-Disposition', 'attachment; filename="PromptForge-IA-Derniere-Version.zip"');
+          res.setHeader('Content-Length', fileData.length);
+          res.send(fileData);
+          return;
+        }
+
         const addDirRecursively = (dirRelative: string) => {
           const absDir = path.join(process.cwd(), dirRelative);
           if (!fs.existsSync(absDir)) return;
           const entries = fs.readdirSync(absDir, { withFileTypes: true });
           for (const entry of entries) {
+            if (entry.name.endsWith('.zip') || entry.name.endsWith('.sqlite') || entry.name.endsWith('.sqlite-journal')) continue;
             const relPath = path.posix.join(dirRelative, entry.name);
             const fullEntryPath = path.join(absDir, entry.name);
             if (entry.isDirectory()) {
@@ -2824,7 +2836,7 @@ ${finalResponseB}
         });
 
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', 'attachment; filename="PromptForge-IA-Pack-Complet.zip"');
+        res.setHeader('Content-Disposition', 'attachment; filename="PromptForge-IA-Derniere-Version.zip"');
         res.send(zipBuffer);
         return;
       } catch (err: any) {
@@ -2845,6 +2857,27 @@ ${finalResponseB}
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    // Fallback for HTML entry point transformed by Vite in dev mode
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      // Skip API routes so they don't get trapped
+      if (url.startsWith('/api/')) {
+        return next();
+      }
+      try {
+        const indexPath = path.resolve(process.cwd(), 'index.html');
+        if (!fs.existsSync(indexPath)) {
+          return next();
+        }
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));

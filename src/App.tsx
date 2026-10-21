@@ -21,15 +21,16 @@ import { SettingsView } from './components/views/SettingsView';
 import { InstallPwaManager } from './components/common/InstallPwaManager';
 
 const WorkspaceShell: React.FC = () => {
-  const { activeView } = useWorkspace();
+  const { activeView, focusMode } = useWorkspace();
+  const isFocusActive = activeView === 'generator' && focusMode;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)]">
-      <Sidebar />
+      {!isFocusActive && <Sidebar />}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar />
+        {!isFocusActive && <TopBar />}
         <main className="flex-1 overflow-y-auto">
-          {activeView === 'dashboard' && <DashboardView />}
+          {(!activeView || activeView === 'dashboard') && <DashboardView />}
           {activeView === 'generator' && <GeneratorView />}
           {activeView === 'optimizer' && <OptimizerView />}
           {activeView === 'playground' && <PlaygroundView />}
@@ -39,6 +40,19 @@ const WorkspaceShell: React.FC = () => {
           {activeView === 'history' && <HistoryView />}
           {activeView === 'evaluator' && <EvaluatorView />}
           {activeView === 'settings' && <SettingsView />}
+          {activeView &&
+            ![
+              'dashboard',
+              'generator',
+              'optimizer',
+              'playground',
+              'software-dev',
+              'library',
+              'templates',
+              'history',
+              'evaluator',
+              'settings',
+            ].includes(activeView) && <DashboardView />}
         </main>
       </div>
       <InstallPwaManager />

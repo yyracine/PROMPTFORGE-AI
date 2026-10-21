@@ -41,6 +41,8 @@ interface WorkspaceContextValue {
   resolvedTheme: 'light' | 'dark';
   sidebarCollapsed: boolean;
   setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  focusMode: boolean;
+  setFocusMode: React.Dispatch<React.SetStateAction<boolean>>;
 
   // Server data
   stats: DashboardStats | null;
@@ -160,6 +162,14 @@ const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefi
 export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+
+  // Guarantee that activeView is always set to 'dashboard' if undefined upon initial mount
+  useEffect(() => {
+    if (!activeView) {
+      setActiveView('dashboard');
+    }
+  }, [activeView]);
 
   // Theme initialization from localStorage before main paint
   const [theme, setThemeState] = useState<ThemeMode>(() => {
@@ -347,6 +357,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         resolvedTheme,
         sidebarCollapsed,
         setSidebarCollapsed,
+        focusMode,
+        setFocusMode,
         stats,
         prompts,
         templates,

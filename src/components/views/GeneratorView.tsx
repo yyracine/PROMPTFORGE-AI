@@ -18,6 +18,8 @@ import {
   Zap,
   Info,
   BarChart2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
@@ -54,6 +56,8 @@ export const GeneratorView: React.FC = () => {
     refreshAllData,
     openPromptInOptimizer,
     openPromptInEvaluator,
+    focusMode,
+    setFocusMode,
     addToast,
   } = useWorkspace();
 
@@ -428,50 +432,85 @@ export const GeneratorView: React.FC = () => {
   const currentNeedNorm = normalizeStr(generatorForm.needDescription);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
+    <div className={`space-y-6 transition-all duration-200 ${focusMode ? 'p-6 max-w-full' : 'p-8 max-w-7xl mx-auto'}`}>
       {/* En-tête */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-subtle)] pb-5">
         <div>
-          <h1 className="text-2xl font-display font-bold text-[var(--text-main)]">
-            Générateur de prompts structurés
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-display font-bold text-[var(--text-main)]">
+              Générateur de prompts structurés
+            </h1>
+            {focusMode && (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30 animate-pulse">
+                Mode Focus actif
+              </span>
+            )}
+          </div>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Transformez une idée simple en instructions structurées avec auto-complétion contextuelle selon la catégorie métier.
+            {focusMode
+              ? 'Espace de travail épuré : sidebar et en-tête masqués pour une concentration totale.'
+              : 'Transformez une idée simple en instructions structurées avec auto-complétion contextuelle selon la catégorie métier.'}
           </p>
         </div>
 
-        {/* Sélecteur de Mode : Rapide / Professionnel / Expert */}
-        <div
-          className="flex items-center gap-1 p-1 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] shrink-0"
-          role="group"
-          aria-label="Mode de génération"
-        >
-          {(
-            [
-              { id: 'rapide', label: 'Mode Rapide' },
-              { id: 'professionnel', label: 'Mode Professionnel' },
-              { id: 'expert', label: 'Mode Expert' },
-            ] as { id: GenerationMode; label: string }[]
-          ).map((m) => (
-            <button
-              key={m.id}
-              onClick={() => updateField('generationMode', m.id)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                generatorForm.generationMode === m.id
-                  ? 'bg-[var(--accent-primary)] text-white'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Bouton Mode Focus */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !focusMode;
+              setFocusMode(next);
+              addToast(
+                'success',
+                next
+                  ? 'Mode Focus activé : sidebar et barres masquées pour maximiser la rédaction.'
+                  : 'Mode standard rétabli.'
+              );
+            }}
+            title={focusMode ? 'Quitter le Mode Focus (afficher la sidebar)' : 'Activer le Mode Focus (masquer la sidebar et maximiser l’espace)'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+              focusMode
+                ? 'bg-[var(--accent-primary)] text-white border-[var(--accent-primary)] shadow-sm'
+                : 'bg-[var(--bg-surface-secondary)] border-[var(--border-subtle)] text-[var(--text-main)] hover:border-[var(--accent-primary)]'
+            }`}
+          >
+            {focusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
+            <span>{focusMode ? 'Quitter le Focus' : 'Mode Focus'}</span>
+          </button>
+
+          {/* Sélecteur de Mode : Rapide / Professionnel / Expert */}
+          <div
+            className="flex items-center gap-1 p-1 rounded-lg bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)] shrink-0"
+            role="group"
+            aria-label="Mode de génération"
+          >
+            {(
+              [
+                { id: 'rapide', label: 'Mode Rapide' },
+                { id: 'professionnel', label: 'Mode Professionnel' },
+                { id: 'expert', label: 'Mode Expert' },
+              ] as { id: GenerationMode; label: string }[]
+            ).map((m) => (
+              <button
+                key={m.id}
+                onClick={() => updateField('generationMode', m.id)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  generatorForm.generationMode === m.id
+                    ? 'bg-[var(--accent-primary)] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Grille 2 colonnes : Formulaire (gauche) & Panneau d'édition du résultat (droite) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Colonne gauche : Formulaire de création (5 cols) */}
-        <div className="lg:col-span-5 space-y-5 bg-[var(--bg-surface)] p-6 rounded-xl border border-[var(--border-subtle)]">
+      <div className={`grid grid-cols-1 ${focusMode ? 'lg:grid-cols-12 gap-6' : 'lg:grid-cols-12 gap-8'} items-start`}>
+        {/* Colonne gauche : Formulaire de création (5 cols ou 4 cols en focus) */}
+        <div className={`${focusMode ? 'lg:col-span-5' : 'lg:col-span-5'} space-y-5 bg-[var(--bg-surface)] p-6 rounded-xl border border-[var(--border-subtle)]`}>
           {/* Sélecteur de Catégorie / Dossier métier (pilote l'auto-complétion intelligente) */}
           <div className="space-y-2 pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center justify-between">

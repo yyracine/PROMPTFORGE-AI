@@ -50,17 +50,22 @@ echo [OK] Demarrage du serveur PromptForge IA sur le port 3000...
 echo (Ne fermez PAS cette fenetre noire pendant que vous utilisez l'application)
 echo.
 
-REM 4. Lancer directement le serveur Node avec tsx
-node "node_modules\tsx\dist\cli.mjs" server.ts
+REM 4. Lancer le serveur Node avec tsx
+echo [OK] Serveur en cours d'execution sur http://localhost:3000
+echo Ouvrez votre navigateur sur : http://localhost:3000
+echo.
+
+call npm run dev
 if errorlevel 1 (
     call npx tsx server.ts
 )
 if errorlevel 1 (
-    call npm run dev
+    node "node_modules\tsx\dist\cli.mjs" server.ts
 )
 
 echo.
 echo ============================================================================
-echo Le serveur s'est arrete.
+echo [ATTENTION] Le serveur s'est arrete.
+echo Verifiez si le port 3000 n'est pas deja utilise par une autre application.
 echo ============================================================================
 pause
